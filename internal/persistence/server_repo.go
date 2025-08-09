@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -19,23 +20,39 @@ func NewServerRepo(db *gorm.DB) *ServerRepo {
 }
 
 func (r *ServerRepo) Create(ctx context.Context, s *Server) error {
-	return r.db.WithContext(ctx).Create(s).Error
+	zap.S().Infow("ServerRepo.Create called", "id", s.ID, "region", s.Region, "type", s.Type)
+	err := r.db.WithContext(ctx).Create(s).Error
+	if err != nil {
+		zap.S().Errorw("ServerRepo.Create failed", "id", s.ID, "error", err)
+	}
+	return err
 }
 
 func (r *ServerRepo) GetByID(ctx context.Context, id string) (*Server, error) {
+	zap.S().Debugw("ServerRepo.GetByID called", "id", id)
 	var s Server
 	err := r.db.WithContext(ctx).Preload("IP").Preload("Billing").Preload("Events").First(&s, "id = ?", id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		zap.S().Warnw("ServerRepo.GetByID not found or error", "id", id, "error", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return &s, err
+	return &s, nil
 }
 
 func (r *ServerRepo) UpdateState(ctx context.Context, id string, newState string) error {
-	return r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Update("state", newState).Error
+	zap.S().Infow("ServerRepo.UpdateState called", "id", id, "state", newState)
+	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Update("state", newState).Error
+	if err != nil {
+		zap.S().Errorw("ServerRepo.UpdateState failed", "id", id, "error", err)
+	}
+	return err
 }
 
 func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit, offset int) ([]Server, error) {
+	zap.S().Debugw("ServerRepo.List called", "region", region, "status", status, "type", typ, "limit", limit, "offset", offset)
 	var servers []Server
 	q := r.db.WithContext(ctx).Model(&Server{}).Preload("IP").Preload("Billing").Preload("Events")
 	if region != "" {
@@ -48,10 +65,15 @@ func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit
 		q = q.Where("type = ?", typ)
 	}
 	q = q.Order("created_at DESC").Limit(limit).Offset(offset)
-	return servers, q.Find(&servers).Error
+	err := q.Find(&servers).Error
+	if err != nil {
+		zap.S().Errorw("ServerRepo.List failed", "error", err)
+	}
+	return servers, err
 }
 
 func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, stopped, terminated *time.Time) error {
+	zap.S().Debugw("ServerRepo.UpdateTimestamps called", "id", id, "started", started, "stopped", stopped, "terminated", terminated)
 	updates := map[string]interface{}{}
 	if started != nil {
 		updates["started_at"] = *started
@@ -65,5 +87,9 @@ func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, s
 	if len(updates) == 0 {
 		return nil
 	}
-	return r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Updates(updates).Error
+	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Updates(updates).Error
+	if err != nil {
+		zap.S().Errorw("ServerRepo.UpdateTimestamps failed", "id", id, "error", err)
+	}
+	return err
 }
