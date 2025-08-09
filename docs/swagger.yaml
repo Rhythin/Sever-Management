@@ -1,0 +1,194 @@
+definitions:
+  api.actionRequest:
+    properties:
+      action:
+        type: string
+    type: object
+  api.actionResponse:
+    properties:
+      result:
+        type: string
+    type: object
+  api.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  api.eventLogResponse:
+    properties:
+      message:
+        type: string
+      timestamp:
+        type: string
+      type:
+        type: string
+    type: object
+  api.provisionRequest:
+    properties:
+      region:
+        type: string
+      type:
+        type: string
+    type: object
+  api.provisionResponse:
+    properties:
+      id:
+        type: string
+    type: object
+  api.serverResponse:
+    properties:
+      id:
+        type: string
+      state:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /server:
+    post:
+      consumes:
+      - application/json
+      description: Provision a new virtual server
+      parameters:
+      - description: Server spec
+        in: body
+        name: server
+        required: true
+        schema:
+          $ref: '#/definitions/api.provisionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.provisionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Provision a new virtual server
+      tags:
+      - servers
+  /servers:
+    get:
+      description: List all servers, filterable by region, status, type; supports
+        pagination and sorting
+      parameters:
+      - description: Region
+        in: query
+        name: region
+        type: string
+      - description: Status
+        in: query
+        name: status
+        type: string
+      - description: Type
+        in: query
+        name: type
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.serverResponse'
+            type: array
+      summary: List servers
+      tags:
+      - servers
+  /servers/{id}:
+    get:
+      description: Retrieve full metadata for a server
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.serverResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Get server metadata
+      tags:
+      - servers
+  /servers/{id}/action:
+    post:
+      consumes:
+      - application/json
+      description: Perform an action (start, stop, reboot, terminate) on a server
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Action
+        in: body
+        name: action
+        required: true
+        schema:
+          $ref: '#/definitions/api.actionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.actionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Perform server action
+      tags:
+      - servers
+  /servers/{id}/logs:
+    get:
+      description: Return last 100 lifecycle events (ring buffer)
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.eventLogResponse'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.errorResponse'
+      summary: Get server logs
+      tags:
+      - servers
+swagger: "2.0"
