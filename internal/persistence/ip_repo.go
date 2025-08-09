@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/rhythin/sever-management/internal/logging"
 	"gorm.io/gorm"
@@ -13,6 +14,7 @@ import (
 
 type IPRepo struct {
 	db *gorm.DB
+	mu sync.Mutex // serialize allocation attempts for extra safety
 }
 
 func NewIPRepo(db *gorm.DB) *IPRepo {
@@ -20,7 +22,10 @@ func NewIPRepo(db *gorm.DB) *IPRepo {
 }
 
 // AllocateIP atomically allocates an available IP and marks it as allocated
+// Uses GORM transaction with row-level locking and a mutex for extra thread safety
 func (r *IPRepo) AllocateIP(ctx context.Context) (*IPAddress, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	log := logging.S(ctx)
 	log.Infow("IPRepo.AllocateIP called")
 	var ip IPAddress
@@ -43,7 +48,6 @@ func (r *IPRepo) AllocateIP(ctx context.Context) (*IPAddress, error) {
 	return &ip, nil
 }
 
-// ReleaseIP marks an IP as unallocated
 func (r *IPRepo) ReleaseIP(ctx context.Context, ipID uint) error {
 	log := logging.S(ctx)
 	log.Infow("IPRepo.ReleaseIP called", "ipID", ipID)

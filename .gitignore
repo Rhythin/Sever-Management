@@ -11,6 +11,8 @@
 # Go modules
 vendor/
 
+# tmp
+tmp/
 
 # Docker
 *.tar
