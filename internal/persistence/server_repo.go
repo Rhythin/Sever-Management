@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/rhythin/sever-management/internal/logging"
 	"gorm.io/gorm"
 )
 
@@ -20,20 +20,22 @@ func NewServerRepo(db *gorm.DB) *ServerRepo {
 }
 
 func (r *ServerRepo) Create(ctx context.Context, s *Server) error {
-	zap.S().Infow("ServerRepo.Create called", "id", s.ID, "region", s.Region, "type", s.Type)
+	log := logging.S(ctx)
+	log.Infow("ServerRepo.Create called", "id", s.ID, "region", s.Region, "type", s.Type)
 	err := r.db.WithContext(ctx).Create(s).Error
 	if err != nil {
-		zap.S().Errorw("ServerRepo.Create failed", "id", s.ID, "error", err)
+		log.Errorw("ServerRepo.Create failed", "id", s.ID, "error", err)
 	}
 	return err
 }
 
 func (r *ServerRepo) GetByID(ctx context.Context, id string) (*Server, error) {
-	zap.S().Debugw("ServerRepo.GetByID called", "id", id)
+	log := logging.S(ctx)
+	log.Debugw("ServerRepo.GetByID called", "id", id)
 	var s Server
 	err := r.db.WithContext(ctx).Preload("IP").Preload("Billing").Preload("Events").First(&s, "id = ?", id).Error
 	if err != nil {
-		zap.S().Warnw("ServerRepo.GetByID not found or error", "id", id, "error", err)
+		log.Warnw("ServerRepo.GetByID not found or error", "id", id, "error", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -43,16 +45,18 @@ func (r *ServerRepo) GetByID(ctx context.Context, id string) (*Server, error) {
 }
 
 func (r *ServerRepo) UpdateState(ctx context.Context, id string, newState string) error {
-	zap.S().Infow("ServerRepo.UpdateState called", "id", id, "state", newState)
+	log := logging.S(ctx)
+	log.Infow("ServerRepo.UpdateState called", "id", id, "state", newState)
 	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Update("state", newState).Error
 	if err != nil {
-		zap.S().Errorw("ServerRepo.UpdateState failed", "id", id, "error", err)
+		log.Errorw("ServerRepo.UpdateState failed", "id", id, "error", err)
 	}
 	return err
 }
 
 func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit, offset int) ([]Server, error) {
-	zap.S().Debugw("ServerRepo.List called", "region", region, "status", status, "type", typ, "limit", limit, "offset", offset)
+	log := logging.S(ctx)
+	log.Debugw("ServerRepo.List called", "region", region, "status", status, "type", typ, "limit", limit, "offset", offset)
 	var servers []Server
 	q := r.db.WithContext(ctx).Model(&Server{}).Preload("IP").Preload("Billing").Preload("Events")
 	if region != "" {
@@ -67,13 +71,14 @@ func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit
 	q = q.Order("created_at DESC").Limit(limit).Offset(offset)
 	err := q.Find(&servers).Error
 	if err != nil {
-		zap.S().Errorw("ServerRepo.List failed", "error", err)
+		log.Errorw("ServerRepo.List failed", "error", err)
 	}
 	return servers, err
 }
 
 func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, stopped, terminated *time.Time) error {
-	zap.S().Debugw("ServerRepo.UpdateTimestamps called", "id", id, "started", started, "stopped", stopped, "terminated", terminated)
+	log := logging.S(ctx)
+	log.Debugw("ServerRepo.UpdateTimestamps called", "id", id, "started", started, "stopped", stopped, "terminated", terminated)
 	updates := map[string]interface{}{}
 	if started != nil {
 		updates["started_at"] = *started
@@ -89,7 +94,7 @@ func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, s
 	}
 	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Updates(updates).Error
 	if err != nil {
-		zap.S().Errorw("ServerRepo.UpdateTimestamps failed", "id", id, "error", err)
+		log.Errorw("ServerRepo.UpdateTimestamps failed", "id", id, "error", err)
 	}
 	return err
 }

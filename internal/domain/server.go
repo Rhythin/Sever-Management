@@ -1,10 +1,13 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/rhythin/sever-management/internal/logging"
 )
 
 // ServerState represents the finite states a server can be in
@@ -116,16 +119,19 @@ func (r *EventRingBuffer) List() []EventLogEntry {
 
 var ErrInvalidTransition = errors.New("invalid state transition")
 
-func (s *Server) Transition(action string) error {
+func (s *Server) Transition(ctx context.Context, action string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	log := logging.S(ctx)
 	now := time.Now()
+	log.Infow("FSM transition attempt", "server_id", s.ID, "from", s.State, "action", action)
 	switch action {
 	case "start":
 		if s.State == ServerStopped {
 			s.State = ServerRunning
 			s.StartedAt = &now
 			s.Log.Add(EventLogEntry{Timestamp: now, Type: EventStarted, Message: "Server started"})
+			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
 	case "stop":
@@ -133,6 +139,7 @@ func (s *Server) Transition(action string) error {
 			s.State = ServerStopped
 			s.StoppedAt = &now
 			s.Log.Add(EventLogEntry{Timestamp: now, Type: EventStopped, Message: "Server stopped"})
+			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
 	case "reboot":
@@ -142,6 +149,7 @@ func (s *Server) Transition(action string) error {
 			// Simulate reboot: immediately back to running
 			s.State = ServerRunning
 			s.Log.Add(EventLogEntry{Timestamp: now, Type: EventStarted, Message: "Server rebooted and running"})
+			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
 	case "terminate":
@@ -149,8 +157,10 @@ func (s *Server) Transition(action string) error {
 			s.State = ServerTerminated
 			s.TerminatedAt = &now
 			s.Log.Add(EventLogEntry{Timestamp: now, Type: EventTerminated, Message: "Server terminated"})
+			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
 	}
+	log.Warnw("FSM invalid transition", "server_id", s.ID, "from", s.State, "action", action)
 	return ErrInvalidTransition
 }

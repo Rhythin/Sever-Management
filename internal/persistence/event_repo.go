@@ -3,7 +3,7 @@ package persistence
 import (
 	"context"
 
-	"go.uber.org/zap"
+	"github.com/rhythin/sever-management/internal/logging"
 	"gorm.io/gorm"
 )
 
@@ -18,16 +18,18 @@ func NewEventRepo(db *gorm.DB) *EventRepo {
 }
 
 func (r *EventRepo) Append(ctx context.Context, event *EventLog) error {
-	zap.S().Debugw("EventRepo.Append called", "serverID", event.ServerID, "type", event.Type)
+	log := logging.S(ctx)
+	log.Debugw("EventRepo.Append called", "serverID", event.ServerID, "type", event.Type)
 	err := r.db.WithContext(ctx).Create(event).Error
 	if err != nil {
-		zap.S().Errorw("EventRepo.Append failed", "serverID", event.ServerID, "error", err)
+		log.Errorw("EventRepo.Append failed", "serverID", event.ServerID, "error", err)
 	}
 	return err
 }
 
 func (r *EventRepo) LastN(ctx context.Context, serverID string, n int) ([]EventLog, error) {
-	zap.S().Debugw("EventRepo.LastN called", "serverID", serverID, "n", n)
+	log := logging.S(ctx)
+	log.Debugw("EventRepo.LastN called", "serverID", serverID, "n", n)
 	var events []EventLog
 	err := r.db.WithContext(ctx).
 		Where("server_id = ?", serverID).
@@ -35,7 +37,7 @@ func (r *EventRepo) LastN(ctx context.Context, serverID string, n int) ([]EventL
 		Limit(n).
 		Find(&events).Error
 	if err != nil {
-		zap.S().Errorw("EventRepo.LastN failed", "serverID", serverID, "error", err)
+		log.Errorw("EventRepo.LastN failed", "serverID", serverID, "error", err)
 	}
 	return events, err
 }

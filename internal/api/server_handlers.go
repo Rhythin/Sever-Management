@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rhythin/sever-management/internal/logging"
 	"github.com/rhythin/sever-management/internal/persistence"
 	"github.com/rhythin/sever-management/internal/service"
-	"go.uber.org/zap"
 )
 
 // ServerHandlers provides HTTP handlers for server endpoints
@@ -16,6 +16,13 @@ import (
 type ServerHandlers struct {
 	Service *service.ServerService
 	Repo    *persistence.ServerRepo
+}
+
+func getRequestID(r *http.Request) string {
+	if rid := r.Header.Get("X-Request-Id"); rid != "" {
+		return rid
+	}
+	return "unknown"
 }
 
 // @Summary Provision a new virtual server
@@ -28,15 +35,16 @@ type ServerHandlers struct {
 // @Failure 400 {object} errorResponse
 // @Router /server [post]
 func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request) {
-	zap.S().Infow("POST /server - ProvisionServer called")
+	log := logging.S(r.Context())
+	log.Infow("POST /server - ProvisionServer called")
 	var req provisionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		zap.S().Warnw("Invalid request body: %v", err)
+		log.Warnw("Invalid request body", "error", err)
 		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	// TODO: Call service to provision server (omitted for brevity)
-	zap.S().Infow("Provisioned server: %+v", zap.Any("request", req))
+	log.Infow("Provisioned server", "request", req)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(provisionResponse{ID: "mock-id"})
 }
@@ -50,12 +58,13 @@ func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request)
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id} [get]
 func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
+	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
-	zap.S().Infow("GET /servers/%s - GetServer called", "id", id)
+	log.Infow("GET /servers/{id} - GetServer called", "id", id)
 	ctx := r.Context()
 	server, err := h.Repo.GetByID(ctx, id)
 	if err != nil || server == nil {
-		zap.S().Warnw("Server not found", "id", id)
+		log.Warnw("Server not found", "id", id)
 		respondError(w, http.StatusNotFound, "server not found")
 		return
 	}
@@ -74,26 +83,27 @@ func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id}/action [post]
 func (h *ServerHandlers) ServerAction(w http.ResponseWriter, r *http.Request) {
+	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
-	zap.S().Infow("POST /servers/%s/action - ServerAction called", "id", id)
+	log.Infow("POST /servers/{id}/action - ServerAction called", "id", id)
 	var req actionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		zap.S().Warnw("Invalid action request body: %v", err)
+		log.Warnw("Invalid action request body", "error", err)
 		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	err := h.Service.Action(r.Context(), id, req.Action)
 	if err != nil {
 		if err.Error() == "server not found" {
-			zap.S().Warnw("Server not found for action", "id", id)
+			log.Warnw("Server not found for action", "id", id)
 			respondError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		zap.S().Warnw("Invalid FSM transition for server", "id", id, "error", err)
+		log.Warnw("Invalid FSM transition for server", "id", id, "error", err)
 		respondError(w, http.StatusConflict, err.Error())
 		return
 	}
-	zap.S().Infof("Action %s performed on server %s", req.Action, id)
+	log.Infow("Action performed on server", "action", req.Action, "id", id)
 	json.NewEncoder(w).Encode(actionResponse{Result: "ok"})
 }
 
@@ -109,7 +119,8 @@ func (h *ServerHandlers) ServerAction(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} serverResponse
 // @Router /servers [get]
 func (h *ServerHandlers) ListServers(w http.ResponseWriter, r *http.Request) {
-	zap.S().Infow("GET /servers - ListServers called")
+	log := logging.S(r.Context())
+	log.Infow("GET /servers - ListServers called")
 	q := r.URL.Query()
 	region := q.Get("region")
 	status := q.Get("status")
@@ -124,7 +135,7 @@ func (h *ServerHandlers) ListServers(w http.ResponseWriter, r *http.Request) {
 	}
 	servers, err := h.Repo.List(r.Context(), region, status, typ, limit, offset)
 	if err != nil {
-		zap.S().Errorw("Failed to list servers", "error", err)
+		log.Errorw("Failed to list servers", "error", err)
 		respondError(w, http.StatusInternalServerError, "failed to list servers")
 		return
 	}
@@ -144,16 +155,17 @@ func (h *ServerHandlers) ListServers(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id}/logs [get]
 func (h *ServerHandlers) GetServerLogs(w http.ResponseWriter, r *http.Request) {
+	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
-	zap.S().Infow("GET /servers/%s/logs - GetServerLogs called", "id", id)
+	log.Infow("GET /servers/{id}/logs - GetServerLogs called", "id", id)
 	events, err := h.Service.GetEvents(r.Context(), id, 100)
 	if err != nil {
-		zap.S().Errorw("Failed to fetch logs for server", "id", id, "error", err)
+		log.Errorw("Failed to fetch logs for server", "id", id, "error", err)
 		respondError(w, http.StatusInternalServerError, "failed to fetch logs")
 		return
 	}
 	if len(events) == 0 {
-		zap.S().Warnw("No logs found for server", "id", id)
+		log.Warnw("No logs found for server", "id", id)
 		respondError(w, http.StatusNotFound, "no logs found")
 		return
 	}

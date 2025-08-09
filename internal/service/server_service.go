@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/rhythin/sever-management/internal/domain"
+	"github.com/rhythin/sever-management/internal/logging"
 	"github.com/rhythin/sever-management/internal/persistence"
-	"go.uber.org/zap"
 )
 
 // ServerService orchestrates server FSM and actions
@@ -24,15 +24,16 @@ func NewServerService(servers *persistence.ServerRepo, ips *persistence.IPRepo, 
 
 // Action performs a state transition (start, stop, reboot, terminate)
 func (s *ServerService) Action(ctx context.Context, id, action string) error {
-	zap.S().Infow("ServerService.Action called", "id", id, "action", action)
+	log := logging.S(ctx)
+	log.Infow("ServerService.Action called", "id", id, "action", action)
 	server, err := s.servers.GetByID(ctx, id)
 	if err != nil || server == nil {
-		zap.S().Warnw("Server not found", "id", id)
+		log.Warnw("Server not found", "id", id)
 		return errors.New("server not found")
 	}
 	d := toDomainServer(server)
-	if err := d.Transition(action); err != nil {
-		zap.S().Warnw("Invalid FSM transition for server", "id", id, "error", err)
+	if err := d.Transition(ctx, action); err != nil {
+		log.Warnw("Invalid FSM transition for server", "id", id, "error", err)
 		return err
 	}
 	// Persist state and timestamps
@@ -46,11 +47,11 @@ func (s *ServerService) Action(ctx context.Context, id, action string) error {
 		terminated = d.TerminatedAt
 	}
 	if err := s.servers.UpdateState(ctx, id, string(d.State)); err != nil {
-		zap.S().Errorw("Failed to update state for server", "id", id, "error", err)
+		log.Errorw("Failed to update state for server", "id", id, "error", err)
 		return err
 	}
 	if err := s.servers.UpdateTimestamps(ctx, id, started, stopped, terminated); err != nil {
-		zap.S().Errorw("Failed to update timestamps for server", "id", id, "error", err)
+		log.Errorw("Failed to update timestamps for server", "id", id, "error", err)
 		return err
 	}
 	// Log event
@@ -62,7 +63,7 @@ func (s *ServerService) Action(ctx context.Context, id, action string) error {
 			Message:   e.Message,
 		})
 	}
-	zap.S().Infow("Action performed on server", "action", action, "id", id)
+	log.Infow("Action performed on server", "action", action, "id", id)
 	return nil
 }
 

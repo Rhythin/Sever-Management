@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rhythin/sever-management/internal/logging"
 	"github.com/rhythin/sever-management/internal/metrics"
 	"go.uber.org/zap"
 )
@@ -11,6 +12,8 @@ import (
 // NewRouter sets up the main chi router with all endpoints
 func NewRouter(serverHandlers *ServerHandlers) http.Handler {
 	r := chi.NewRouter()
+
+	r.Use(logging.RequestIDMiddleware)
 
 	zap.S().Info("Setting up main router and endpoints")
 
