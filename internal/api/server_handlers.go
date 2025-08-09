@@ -18,13 +18,6 @@ type ServerHandlers struct {
 	Repo    *persistence.ServerRepo
 }
 
-func getRequestID(r *http.Request) string {
-	if rid := r.Header.Get("X-Request-Id"); rid != "" {
-		return rid
-	}
-	return "unknown"
-}
-
 // @Summary Provision a new virtual server
 // @Description Provision a new virtual server
 // @Tags servers
@@ -43,10 +36,23 @@ func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request)
 		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	// TODO: Call service to provision server (omitted for brevity)
-	log.Infow("Provisioned server", "request", req)
+	if req.Region == "" || req.Type == "" {
+		respondError(w, http.StatusBadRequest, "region and type are required")
+		return
+	}
+	id, err := h.Service.Provision(r.Context(), req.Region, req.Type)
+	if err != nil {
+		log.Errorw("Failed to provision server", "error", err)
+		if err.Error() == "no available IPs" {
+			respondError(w, http.StatusConflict, "no available IPs")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "failed to provision server")
+		return
+	}
+	log.Infow("Provisioned server", "id", id, "request", req)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(provisionResponse{ID: "mock-id"})
+	json.NewEncoder(w).Encode(provisionResponse{ID: id})
 }
 
 // @Summary Get server metadata
@@ -68,7 +74,23 @@ func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "server not found")
 		return
 	}
-	json.NewEncoder(w).Encode(serverResponse{ID: server.ID, State: server.State})
+	var lastBilled *string
+	if server.Billing.LastBilledAt != nil {
+		s := server.Billing.LastBilledAt.Format("2006-01-02T15:04:05Z07:00")
+		lastBilled = &s
+	}
+	resp := serverResponse{
+		ID:     server.ID,
+		State:  server.State,
+		Region: server.Region,
+		Type:   server.Type,
+		Billing: &billingResponse{
+			AccumulatedSeconds: server.Billing.AccumulatedSeconds,
+			LastBilledAt:       lastBilled,
+			TotalCost:          server.Billing.TotalCost,
+		},
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 // @Summary Perform server action
@@ -185,14 +207,23 @@ type provisionResponse struct {
 	ID string `json:"id"`
 }
 type serverResponse struct {
-	ID    string `json:"id"`
-	State string `json:"state"`
+	ID      string           `json:"id"`
+	State   string           `json:"state"`
+	Region  string           `json:"region,omitempty"`
+	Type    string           `json:"type,omitempty"`
+	Billing *billingResponse `json:"billing,omitempty"`
+}
+
+type billingResponse struct {
+	AccumulatedSeconds int64   `json:"accumulated_seconds"`
+	LastBilledAt       *string `json:"last_billed_at,omitempty"`
+	TotalCost          float64 `json:"total_cost"`
 }
 type errorResponse struct {
 	Error string `json:"error"`
 }
 type actionRequest struct {
-	Action string `json:"action"`
+	Action string `json:"action"` // must be one of start|stop|reboot|terminate
 }
 type actionResponse struct {
 	Result string `json:"result"`

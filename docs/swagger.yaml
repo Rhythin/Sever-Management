@@ -2,12 +2,22 @@ definitions:
   api.actionRequest:
     properties:
       action:
+        description: must be one of start|stop|reboot|terminate
         type: string
     type: object
   api.actionResponse:
     properties:
       result:
         type: string
+    type: object
+  api.billingResponse:
+    properties:
+      accumulated_seconds:
+        type: integer
+      last_billed_at:
+        type: string
+      total_cost:
+        type: number
     type: object
   api.errorResponse:
     properties:
@@ -37,9 +47,15 @@ definitions:
     type: object
   api.serverResponse:
     properties:
+      billing:
+        $ref: '#/definitions/api.billingResponse'
       id:
         type: string
+      region:
+        type: string
       state:
+        type: string
+      type:
         type: string
     type: object
 info:

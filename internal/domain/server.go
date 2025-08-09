@@ -58,6 +58,16 @@ type BillingInfo struct {
 	TotalCost          float64
 }
 
+// ServerAction represents allowed actions on a server
+type ServerAction string
+
+const (
+	ActionStart     ServerAction = "start"
+	ActionStop      ServerAction = "stop"
+	ActionReboot    ServerAction = "reboot"
+	ActionTerminate ServerAction = "terminate"
+)
+
 // EventType for server lifecycle events
 
 type EventType string
@@ -119,14 +129,14 @@ func (r *EventRingBuffer) List() []EventLogEntry {
 
 var ErrInvalidTransition = errors.New("invalid state transition")
 
-func (s *Server) Transition(ctx context.Context, action string) error {
+func (s *Server) Transition(ctx context.Context, action ServerAction) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	log := logging.S(ctx)
 	now := time.Now()
-	log.Infow("FSM transition attempt", "server_id", s.ID, "from", s.State, "action", action)
+	log.Infow("FSM transition attempt", "server_id", s.ID, "from", s.State, "action", string(action))
 	switch action {
-	case "start":
+	case ActionStart:
 		if s.State == ServerStopped {
 			s.State = ServerRunning
 			s.StartedAt = &now
@@ -134,7 +144,7 @@ func (s *Server) Transition(ctx context.Context, action string) error {
 			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
-	case "stop":
+	case ActionStop:
 		if s.State == ServerRunning {
 			s.State = ServerStopped
 			s.StoppedAt = &now
@@ -142,7 +152,7 @@ func (s *Server) Transition(ctx context.Context, action string) error {
 			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
-	case "reboot":
+	case ActionReboot:
 		if s.State == ServerRunning {
 			s.State = ServerRebooting
 			s.Log.Add(EventLogEntry{Timestamp: now, Type: EventRebooted, Message: "Server rebooting"})
@@ -152,7 +162,7 @@ func (s *Server) Transition(ctx context.Context, action string) error {
 			log.Infow("FSM transition success", "server_id", s.ID, "to", s.State)
 			return nil
 		}
-	case "terminate":
+	case ActionTerminate:
 		if s.State != ServerTerminated {
 			s.State = ServerTerminated
 			s.TerminatedAt = &now
@@ -161,6 +171,6 @@ func (s *Server) Transition(ctx context.Context, action string) error {
 			return nil
 		}
 	}
-	log.Warnw("FSM invalid transition", "server_id", s.ID, "from", s.State, "action", action)
+	log.Warnw("FSM invalid transition", "server_id", s.ID, "from", s.State, "action", string(action))
 	return ErrInvalidTransition
 }

@@ -242,6 +242,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "action": {
+                    "description": "must be one of start|stop|reboot|terminate",
                     "type": "string"
                 }
             }
@@ -251,6 +252,20 @@ const docTemplate = `{
             "properties": {
                 "result": {
                     "type": "string"
+                }
+            }
+        },
+        "api.billingResponse": {
+            "type": "object",
+            "properties": {
+                "accumulated_seconds": {
+                    "type": "integer"
+                },
+                "last_billed_at": {
+                    "type": "string"
+                },
+                "total_cost": {
+                    "type": "number"
                 }
             }
         },
@@ -298,10 +313,19 @@ const docTemplate = `{
         "api.serverResponse": {
             "type": "object",
             "properties": {
+                "billing": {
+                    "$ref": "#/definitions/api.billingResponse"
+                },
                 "id": {
                     "type": "string"
                 },
+                "region": {
+                    "type": "string"
+                },
                 "state": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
