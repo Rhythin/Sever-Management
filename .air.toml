@@ -1,0 +1,22 @@
+# .air.toml for Docker-based autoreload
+root = "."
+
+[build]
+  cmd = "make docker-build"
+  bin = ""
+  include_ext = ["go", "mod", "sum"]
+  exclude_dir = ["vendor", "pgdata"]
+  delay = 1000
+
+[log]
+  time = true
+
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"
+  runner = "magenta"
+
+[run]
+  cmd = "docker-compose up --build"
+  stop_on_error = true
