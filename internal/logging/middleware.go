@@ -10,13 +10,10 @@ import (
 
 const requestIDKey = "request_id"
 
-// Middleware injects a request ID into the context and header
+// Middleware injects a new request ID into the context and header
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqID := r.Header.Get("X-Request-Id")
-		if reqID == "" {
-			reqID = uuid.NewString()
-		}
+		reqID := uuid.NewString() // Always generate a new UUID
 		ctx := context.WithValue(r.Context(), requestIDKey, reqID)
 		w.Header().Set("X-Request-Id", reqID)
 		next.ServeHTTP(w, r.WithContext(ctx))

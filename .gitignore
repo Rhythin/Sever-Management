@@ -1,0 +1,39 @@
+# Go build
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go modules
+vendor/
+
+
+# Docker
+*.tar
+*.img
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+
+# Coverage
+coverage*
+
+# Postgres data
+pgdata/
+
+
+
+# Misc
+.env
+.env.*
