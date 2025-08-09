@@ -1,9 +1,11 @@
 package persistence
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rhythin/sever-management/internal"
+	"github.com/rhythin/sever-management/internal/logging"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -18,9 +20,21 @@ func NewDB(cfg *internal.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Auto-migrate all models
-	if err := db.AutoMigrate(&Server{}, &IPAddress{}, &Billing{}, &EventLog{}); err != nil {
+	ctx := context.Background()
+	if err := MigrateDB(ctx, db); err != nil {
 		return nil, err
 	}
 	return db, nil
+}
+
+// MigrateDB runs GORM AutoMigrate for all models
+func MigrateDB(ctx context.Context, db *gorm.DB) error {
+	log := logging.S(ctx)
+	log.Infow("Running DB automigration")
+	if err := db.AutoMigrate(&Server{}, &IPAddress{}, &Billing{}, &EventLog{}); err != nil {
+		log.Errorw("DB automigration failed", "error", err)
+		return err
+	}
+	log.Infow("DB automigration complete")
+	return nil
 }

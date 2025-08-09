@@ -1,4 +1,4 @@
-# .air.toml for Docker-based autoreload
+# .air.docker.toml for Docker Compose hot reload
 root = "."
 
 [build]
