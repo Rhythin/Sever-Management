@@ -9,16 +9,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewRouter sets up the main chi router with all endpoints
 func NewRouter(serverHandlers *ServerHandlers) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(logging.RequestIDMiddleware)
 
 	zap.S().Info("Setting up main router and endpoints")
-
-	// Logging middleware placeholder (add real logging as needed)
-	// r.Use(loggingMiddleware)
 
 	// Health and readiness
 	zap.S().Info("Registering /healthz and /readyz endpoints")
@@ -31,7 +27,7 @@ func NewRouter(serverHandlers *ServerHandlers) http.Handler {
 
 	// Swagger UI
 	zap.S().Info("Registering /swagger/* endpoint")
-	r.Get("/swagger/*", http.HandlerFunc(NewSwaggerHandler().ServeHTTP))
+	r.Get("/swagger/*", NewSwaggerHandler().ServeHTTP)
 
 	// Server API
 	zap.S().Info("Registering server API endpoints")
