@@ -92,6 +92,7 @@ func (s *ServerService) Provision(ctx context.Context, region, typ string) (stri
 		State:     string(domain.ServerProvisioning),
 		CreatedAt: now,
 		UpdatedAt: now,
+		Billing:   &persistence.Billing{},
 	}
 
 	// Persist server
@@ -99,33 +100,54 @@ func (s *ServerService) Provision(ctx context.Context, region, typ string) (stri
 	if err != nil {
 		log.Errorw("Failed to persist server", "error", err)
 		// Rollback IP allocation
-		_ = s.ips.ReleaseIP(ctx, ip.ID)
+		if err := s.ips.ReleaseIP(ctx, ip.ID); err != nil {
+			log.Errorw("Failed to release IP", "error", err)
+		}
+		return "", err
+	}
+	timeCreated := time.Now()
+
+	// Link IP to server record for reverse reference
+	err = s.ips.AssignIPToServer(ctx, ip.ID, server.ID)
+	if err != nil {
+		log.Errorw("Failed to assign IP to server", "error", err)
 		return "", err
 	}
 
-	// Link IP to server record for reverse reference
-	_ = s.ips.AssignIPToServer(ctx, ip.ID, server.ID)
-
-	// Optionally, update server state to running immediately (simulate provisioning)
-	err = s.servers.UpdateState(ctx, server.ID, string(domain.ServerRunning))
+	// Update server state to running immediately (simulate provisioning)
+	// simulate a small delay to simulate provisioning
+	time.Sleep(1 * time.Second)
+	timeStarted := time.Now()
+	err = s.servers.UpdateServer(ctx, server.ID, &persistence.Server{
+		State:     string(domain.ServerRunning),
+		StartedAt: &timeStarted,
+	})
 	if err != nil {
 		log.Errorw("Failed to update server state to running", "error", err)
 		return server.ID, err // server is created, but state update failed
 	}
 
 	// Log provision and running events
-	_ = s.events.Append(ctx, &persistence.EventLog{
+	err = s.events.Append(ctx, &persistence.EventLog{
 		ServerID:  server.ID,
-		Timestamp: now,
+		Timestamp: timeCreated,
 		Type:      string(domain.EventProvisioned),
 		Message:   "Server provisioned",
 	})
-	_ = s.events.Append(ctx, &persistence.EventLog{
+	if err != nil {
+		log.Errorw("Failed to log provision event", "error", err)
+		return server.ID, err
+	}
+	err = s.events.Append(ctx, &persistence.EventLog{
 		ServerID:  server.ID,
-		Timestamp: now,
+		Timestamp: timeStarted,
 		Type:      string(domain.EventStarted),
 		Message:   "Server running",
 	})
+	if err != nil {
+		log.Errorw("Failed to log running event", "error", err)
+		return server.ID, err
+	}
 
 	return server.ID, nil
 }

@@ -18,8 +18,8 @@ type Server struct {
 	StartedAt    *time.Time
 	StoppedAt    *time.Time
 	TerminatedAt *time.Time
-	Billing      Billing    `gorm:"foreignKey:ServerID"`
-	Events       []EventLog `gorm:"foreignKey:ServerID"`
+	Billing      *Billing    `gorm:"foreignKey:ServerID"`
+	Events       []*EventLog `gorm:"foreignKey:ServerID"`
 }
 
 // IPAddress tracks allocated IPs

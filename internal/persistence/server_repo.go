@@ -54,10 +54,10 @@ func (r *ServerRepo) UpdateState(ctx context.Context, id string, newState string
 	return err
 }
 
-func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit, offset int) ([]Server, error) {
+func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit, offset int) ([]*Server, error) {
 	log := logging.S(ctx)
 	log.Debugw("ServerRepo.List called", "region", region, "status", status, "type", typ, "limit", limit, "offset", offset)
-	var servers []Server
+	var servers []*Server
 	q := r.db.WithContext(ctx).Model(&Server{}).Preload("IP").Preload("Billing").Preload("Events")
 	if region != "" {
 		q = q.Where("region = ?", region)
@@ -95,6 +95,29 @@ func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, s
 	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Updates(updates).Error
 	if err != nil {
 		log.Errorw("ServerRepo.UpdateTimestamps failed", "id", id, "error", err)
+	}
+	return err
+}
+
+func (r *ServerRepo) UpdateBilling(ctx context.Context, id string, accumulatedSeconds int64, totalCost float64) error {
+	log := logging.S(ctx)
+	log.Debugw("ServerRepo.UpdateBilling called", "id", id, "accumulatedSeconds", accumulatedSeconds, "totalCost", totalCost)
+	err := r.db.WithContext(ctx).Model(&Billing{}).Where("server_id = ?", id).UpdateColumns(map[string]interface{}{
+		"accumulated_seconds": accumulatedSeconds,
+		"total_cost":          totalCost,
+	}).Error
+	if err != nil {
+		log.Errorw("ServerRepo.UpdateBilling failed", "id", id, "error", err)
+	}
+	return err
+}
+
+func (r *ServerRepo) UpdateServer(ctx context.Context, id string, server *Server) error {
+	log := logging.S(ctx)
+	log.Debugw("ServerRepo.UpdateServer called", "id", id)
+	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Updates(server).Error
+	if err != nil {
+		log.Errorw("ServerRepo.UpdateServer failed", "id", id, "error", err)
 	}
 	return err
 }

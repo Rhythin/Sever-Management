@@ -54,8 +54,8 @@ func runServer(
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			zap.S().Infof("Starting server on :%d", cfg.HTTPPort)
-			go billing.Run(ctx)
-			go reaper.Run(ctx)
+			go billing.Run(context.Background())
+			go reaper.Run(context.Background())
 			go func() {
 				if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					zap.S().Errorw("HTTP server error: %v", err)

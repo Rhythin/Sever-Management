@@ -22,14 +22,29 @@ func NewIdleReaper(servers *persistence.ServerRepo, cfg *internal.Config) *IdleR
 }
 
 func (r *IdleReaper) Run(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute) // runs every minute
-	defer ticker.Stop()
+	interval := r.cfg.ReaperInterval
+	if interval <= 0 {
+		interval = time.Minute
+	}
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			r.reap(ctx)
+		ticker := time.NewTicker(interval)
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				func() {
+					defer func() {
+						if rec := recover(); rec != nil {
+							logging.S(ctx).Errorw("IdleReaper panicked; will continue", "recover", rec)
+						}
+					}()
+					ctx, cancel := context.WithTimeout(ctx, r.cfg.RequestTimeout)
+					defer cancel()
+					r.reap(ctx)
+				}()
+			}
 		}
 	}
 }
@@ -53,7 +68,12 @@ func (r *IdleReaper) reap(ctx context.Context) {
 					log.Errorw("IdleReaper failed to terminate server", "id", s.ID, "error", err)
 					return err
 				}
-				_ = r.servers.UpdateTimestamps(ctx, s.ID, nil, nil, ptrTime(time.Now()))
+				err = r.servers.UpdateTimestamps(ctx, s.ID, nil, nil, ptrTime(time.Now()))
+				if err != nil {
+					log.Errorw("IdleReaper failed to update timestamps for server", "id", s.ID, "error", err)
+					return err
+				}
+
 				log.Warnw("IdleReaper terminated idle server", "id", s.ID)
 				return nil
 			})
