@@ -4,10 +4,11 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rhythin/sever-management/internal/handlers"
 )
 
 // NewServerRouter sets up chi routes for server endpoints
-func NewServerRouter(h *ServerHandlers) http.Handler {
+func NewServerRouter(h *handlers.ServerHandlers) http.Handler {
 	r := chi.NewRouter()
 
 	r.Post("/server", h.ProvisionServer)

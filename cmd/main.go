@@ -10,6 +10,7 @@ import (
 
 	"github.com/rhythin/sever-management/internal"
 	"github.com/rhythin/sever-management/internal/api"
+	"github.com/rhythin/sever-management/internal/handlers"
 	"github.com/rhythin/sever-management/internal/logging"
 	"github.com/rhythin/sever-management/internal/persistence"
 	"github.com/rhythin/sever-management/internal/service"
@@ -29,8 +30,8 @@ func main() {
 			service.NewBillingDaemon,
 			service.NewIdleReaper,
 			logging.InitLogger,
-			func(svc *service.ServerService, repo *persistence.ServerRepo) *api.ServerHandlers {
-				return &api.ServerHandlers{Service: svc, Repo: repo}
+			func(svc *service.ServerService, repo *persistence.ServerRepo) *handlers.ServerHandlers {
+				return &handlers.ServerHandlers{Service: svc, Repo: repo}
 			},
 			api.NewRouter,
 		),

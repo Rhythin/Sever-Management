@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rhythin/sever-management/internal/logging"
+	"github.com/rhythin/sever-management/internal/packets"
 	"github.com/rhythin/sever-management/internal/persistence"
 	"github.com/rhythin/sever-management/internal/service"
 )
@@ -30,7 +31,7 @@ type ServerHandlers struct {
 func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
 	log.Infow("POST /server - ProvisionServer called")
-	var req provisionRequest
+	var req packets.ProvisionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Warnw("Invalid request body", "error", err)
 		respondError(w, http.StatusBadRequest, "invalid request body")
@@ -52,7 +53,7 @@ func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request)
 	}
 	log.Infow("Provisioned server", "id", id, "request", req)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(provisionResponse{ID: id})
+	json.NewEncoder(w).Encode(packets.ProvisionResponse{ID: id})
 }
 
 // @Summary Get server metadata
@@ -79,12 +80,12 @@ func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
 		s := server.Billing.LastBilledAt.Format("2006-01-02T15:04:05Z07:00")
 		lastBilled = &s
 	}
-	resp := serverResponse{
+	resp := packets.ServerResponse{
 		ID:     server.ID,
 		State:  server.State,
 		Region: server.Region,
 		Type:   server.Type,
-		Billing: &billingResponse{
+		Billing: &packets.BillingResponse{
 			AccumulatedSeconds: server.Billing.AccumulatedSeconds,
 			LastBilledAt:       lastBilled,
 			TotalCost:          server.Billing.TotalCost,
@@ -99,8 +100,8 @@ func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Server ID"
-// @Param action body actionRequest true "Action"
-// @Success 200 {object} actionResponse
+// @Param action body packets.ActionRequest true "Action"
+// @Success 200 {object} packets.ActionResponse
 // @Failure 409 {object} errorResponse
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id}/action [post]
@@ -108,7 +109,7 @@ func (h *ServerHandlers) ServerAction(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
 	log.Infow("POST /servers/{id}/action - ServerAction called", "id", id)
-	var req actionRequest
+	var req packets.ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Warnw("Invalid action request body", "error", err)
 		respondError(w, http.StatusBadRequest, "invalid request body")
@@ -126,7 +127,7 @@ func (h *ServerHandlers) ServerAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Infow("Action performed on server", "action", req.Action, "id", id)
-	json.NewEncoder(w).Encode(actionResponse{Result: "ok"})
+	json.NewEncoder(w).Encode(packets.ActionResponse{Result: "ok"})
 }
 
 // @Summary List servers
@@ -161,9 +162,9 @@ func (h *ServerHandlers) ListServers(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "failed to list servers")
 		return
 	}
-	resp := make([]serverResponse, 0, len(servers))
+	resp := make([]packets.ServerResponse, 0, len(servers))
 	for _, s := range servers {
-		resp = append(resp, serverResponse{ID: s.ID, State: s.State})
+		resp = append(resp, packets.ServerResponse{ID: s.ID, State: s.State})
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -191,47 +192,17 @@ func (h *ServerHandlers) GetServerLogs(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "no logs found")
 		return
 	}
-	resp := make([]eventLogResponse, 0, len(events))
+	resp := make([]packets.EventLogResponse, 0, len(events))
 	for _, e := range events {
-		resp = append(resp, eventLogResponse{Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"), Type: e.Type, Message: e.Message})
+		resp = append(resp, packets.EventLogResponse{Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"), Type: e.Type, Message: e.Message})
 	}
 	json.NewEncoder(w).Encode(resp)
 }
 
 // --- Request/Response types ---
-type provisionRequest struct {
-	Region string `json:"region"`
-	Type   string `json:"type"`
-}
-type provisionResponse struct {
-	ID string `json:"id"`
-}
-type serverResponse struct {
-	ID      string           `json:"id"`
-	State   string           `json:"state"`
-	Region  string           `json:"region,omitempty"`
-	Type    string           `json:"type,omitempty"`
-	Billing *billingResponse `json:"billing,omitempty"`
-}
 
-type billingResponse struct {
-	AccumulatedSeconds int64   `json:"accumulated_seconds"`
-	LastBilledAt       *string `json:"last_billed_at,omitempty"`
-	TotalCost          float64 `json:"total_cost"`
-}
 type errorResponse struct {
 	Error string `json:"error"`
-}
-type actionRequest struct {
-	Action string `json:"action"` // must be one of start|stop|reboot|terminate
-}
-type actionResponse struct {
-	Result string `json:"result"`
-}
-type eventLogResponse struct {
-	Timestamp string `json:"timestamp"`
-	Type      string `json:"type"`
-	Message   string `json:"message"`
 }
 
 func respondError(w http.ResponseWriter, code int, msg string) {

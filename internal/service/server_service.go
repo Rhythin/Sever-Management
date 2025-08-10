@@ -23,7 +23,7 @@ func NewServerService(servers *persistence.ServerRepo, ips *persistence.IPRepo, 
 }
 
 // Action performs a state transition (start, stop, reboot, terminate)
-func (s *ServerService) Action(ctx context.Context, id string, action string) error {
+func (s *ServerService) Action(ctx context.Context, id string, action domain.ServerAction) error {
 	log := logging.S(ctx)
 	log.Infow("ServerService.Action called", "id", id, "action", action)
 	server, err := s.servers.GetByID(ctx, id)
@@ -32,7 +32,7 @@ func (s *ServerService) Action(ctx context.Context, id string, action string) er
 		return errors.New("server not found")
 	}
 	d := toDomainServer(server)
-	if err := d.Transition(ctx, domain.ServerAction(action)); err != nil {
+	if err := d.Transition(ctx, action); err != nil {
 		log.Warnw("Invalid FSM transition for server", "id", id, "error", err)
 		return err
 	}
