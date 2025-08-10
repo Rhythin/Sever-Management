@@ -7,7 +7,7 @@ import (
 // Server represents a virtual server instance in the DB
 
 type Server struct {
-	ID           string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ID           string `gorm:"primaryKey;type:text"`
 	Region       string
 	Type         string
 	IPID         *uint // Foreign key to IPAddress
@@ -22,6 +22,11 @@ type Server struct {
 	Events       []*EventLog `gorm:"foreignKey:ServerID"`
 }
 
+// TableName specifies the table name for Server
+func (Server) TableName() string {
+	return "servers"
+}
+
 // IPAddress tracks allocated IPs
 
 type IPAddress struct {
@@ -29,6 +34,11 @@ type IPAddress struct {
 	Address   string `gorm:"uniqueIndex"`
 	Allocated bool
 	ServerID  *string // Nullable, FK to Server
+}
+
+// TableName specifies the table name for IPAddress
+func (IPAddress) TableName() string {
+	return "ip_addresses"
 }
 
 // Billing tracks server cost and uptime
@@ -41,6 +51,11 @@ type Billing struct {
 	TotalCost          float64
 }
 
+// TableName specifies the table name for Billing
+func (Billing) TableName() string {
+	return "billing"
+}
+
 // EventLog stores server lifecycle events
 
 type EventLog struct {
@@ -49,4 +64,9 @@ type EventLog struct {
 	Timestamp time.Time
 	Type      string
 	Message   string
+}
+
+// TableName specifies the table name for EventLog
+func (EventLog) TableName() string {
+	return "event_logs"
 }

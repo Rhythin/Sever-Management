@@ -41,3 +41,23 @@ func (r *EventRepo) LastN(ctx context.Context, serverID string, n int) ([]EventL
 	}
 	return events, err
 }
+
+// GetEvents returns all events for a server, ordered by timestamp (newest first)
+func (r *EventRepo) GetEvents(ctx context.Context, serverID string) ([]EventLog, error) {
+	log := logging.S(ctx)
+	log.Debugw("EventRepo.GetEvents called", "serverID", serverID)
+	var events []EventLog
+	err := r.db.WithContext(ctx).
+		Where("server_id = ?", serverID).
+		Order("timestamp DESC").
+		Find(&events).Error
+	if err != nil {
+		log.Errorw("EventRepo.GetEvents failed", "serverID", serverID, "error", err)
+	}
+	return events, err
+}
+
+// AddEvent is an alias for Append for backward compatibility
+func (r *EventRepo) AddEvent(ctx context.Context, event *EventLog) error {
+	return r.Append(ctx, event)
+}

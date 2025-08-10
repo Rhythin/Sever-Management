@@ -56,7 +56,10 @@ func (r *IPRepo) AllocateIP(ctx context.Context) (*IPAddress, error) {
 func (r *IPRepo) ReleaseIP(ctx context.Context, ipID uint) error {
 	log := logging.S(ctx)
 	log.Infow("IPRepo.ReleaseIP called", "ipID", ipID)
-	err := r.db.WithContext(ctx).Model(&IPAddress{}).Where("id = ?", ipID).Update("allocated", false).Error
+	err := r.db.WithContext(ctx).Model(&IPAddress{}).Where("id = ?", ipID).Updates(map[string]interface{}{
+		"allocated": false,
+		"server_id": nil,
+	}).Error
 	if err != nil {
 		log.Errorw("IPRepo.ReleaseIP failed", "ipID", ipID, "error", err)
 	}
@@ -67,6 +70,18 @@ func (r *IPRepo) ReleaseIP(ctx context.Context, ipID uint) error {
 func (r *IPRepo) AssignIPToServer(ctx context.Context, ipID uint, serverID string) error {
 	log := logging.S(ctx)
 	log.Infow("IPRepo.AssignIPToServer called", "ipID", ipID, "serverID", serverID)
+
+	// Check if IP exists first
+	var ip IPAddress
+	if err := r.db.WithContext(ctx).First(&ip, ipID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Warnw("IPRepo.AssignIPToServer IP not found", "ipID", ipID)
+			return errors.New("IP not found")
+		}
+		log.Errorw("IPRepo.AssignIPToServer query failed", "ipID", ipID, "error", err)
+		return err
+	}
+
 	err := r.db.WithContext(ctx).Model(&IPAddress{}).Where("id = ?", ipID).Update("server_id", serverID).Error
 	if err != nil {
 		log.Errorw("IPRepo.AssignIPToServer failed", "ipID", ipID, "serverID", serverID, "error", err)

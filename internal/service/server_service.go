@@ -13,12 +13,12 @@ import (
 // ServerService orchestrates server FSM and actions
 
 type ServerService struct {
-	servers *persistence.ServerRepo
-	ips     *persistence.IPRepo
-	events  *persistence.EventRepo
+	servers ServerRepoInterface
+	ips     IPRepoInterface
+	events  EventRepoInterface
 }
 
-func NewServerService(servers *persistence.ServerRepo, ips *persistence.IPRepo, events *persistence.EventRepo) *ServerService {
+func NewServerService(servers ServerRepoInterface, ips IPRepoInterface, events EventRepoInterface) *ServerService {
 	return &ServerService{servers: servers, ips: ips, events: events}
 }
 
