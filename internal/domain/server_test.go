@@ -239,3 +239,36 @@ func TestServerAction_String(t *testing.T) {
 	assert.Equal(t, "reboot", string(ActionReboot))
 	assert.Equal(t, "terminate", string(ActionTerminate))
 }
+
+func TestIsValidAction(t *testing.T) {
+	type args struct {
+		action ServerAction
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "valid action",
+			args: args{
+				action: ActionStart,
+			},
+			want: true,
+		},
+		{
+			name: "invalid action",
+			args: args{
+				action: ServerAction("invalid-action"),
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidAction(tt.args.action); got != tt.want {
+				t.Errorf("IsValidAction() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
