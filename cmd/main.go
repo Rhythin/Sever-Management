@@ -30,8 +30,8 @@ func main() {
 			service.NewBillingDaemon,
 			service.NewIdleReaper,
 			logging.InitLogger,
-			func(svc *service.ServerService, repo *persistence.ServerRepo) *handlers.ServerHandlers {
-				return &handlers.ServerHandlers{Service: svc, Repo: repo}
+			func(svc service.ServerService) handlers.ServerHandler {
+				return handlers.NewServerHandler(svc)
 			},
 			api.NewRouter,
 		),

@@ -174,3 +174,13 @@ func (s *Server) Transition(ctx context.Context, action ServerAction) error {
 	log.Warnw("FSM invalid transition", "server_id", s.ID, "from", s.State, "action", string(action))
 	return ErrInvalidTransition
 }
+
+// IsValidAction checks if the provided action is a valid server action
+func IsValidAction(action ServerAction) bool {
+	switch action {
+	case ActionStart, ActionStop, ActionReboot, ActionTerminate:
+		return true
+	default:
+		return false
+	}
+}

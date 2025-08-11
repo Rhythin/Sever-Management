@@ -12,18 +12,18 @@ import (
 
 // ServerService orchestrates server FSM and actions
 
-type ServerService struct {
-	servers ServerRepoInterface
-	ips     IPRepoInterface
-	events  EventRepoInterface
+type serverService struct {
+	servers persistence.ServerRepoInterface
+	ips     persistence.IPRepoInterface
+	events  persistence.EventRepoInterface
 }
 
-func NewServerService(servers ServerRepoInterface, ips IPRepoInterface, events EventRepoInterface) *ServerService {
-	return &ServerService{servers: servers, ips: ips, events: events}
+func NewServerService(servers persistence.ServerRepoInterface, ips persistence.IPRepoInterface, events persistence.EventRepoInterface) ServerService {
+	return &serverService{servers: servers, ips: ips, events: events}
 }
 
 // Action performs a state transition (start, stop, reboot, terminate)
-func (s *ServerService) Action(ctx context.Context, id string, action domain.ServerAction) error {
+func (s *serverService) Action(ctx context.Context, id string, action domain.ServerAction) error {
 	log := logging.S(ctx)
 	log.Infow("ServerService.Action called", "id", id, "action", action)
 	server, err := s.servers.GetByID(ctx, id)
@@ -68,7 +68,7 @@ func (s *ServerService) Action(ctx context.Context, id string, action domain.Ser
 }
 
 // Provision provisions a new server, allocates an IP, and persists it
-func (s *ServerService) Provision(ctx context.Context, region, typ string) (string, error) {
+func (s *serverService) Provision(ctx context.Context, region, typ string) (string, error) {
 	log := logging.S(ctx)
 	log.Infow("ServerService.Provision called", "region", region, "type", typ)
 
@@ -164,6 +164,14 @@ func toDomainServer(s *persistence.Server) *domain.Server {
 	}
 }
 
-func (s *ServerService) GetEvents(ctx context.Context, id string, n int) ([]persistence.EventLog, error) {
+func (s *serverService) GetEvents(ctx context.Context, id string, n int) ([]persistence.EventLog, error) {
 	return s.events.LastN(ctx, id, n)
+}
+
+func (s *serverService) ListServers(ctx context.Context, region, status, typ string, limit, offset int) ([]*persistence.Server, error) {
+	return s.servers.List(ctx, region, status, typ, limit, offset)
+}
+
+func (s *serverService) GetServerByID(ctx context.Context, id string) (*persistence.Server, error) {
+	return s.servers.GetByID(ctx, id)
 }

@@ -10,11 +10,12 @@ type ProvisionResponse struct {
 	ID string `json:"id"`
 }
 type ServerResponse struct {
-	ID      string           `json:"id"`
-	State   string           `json:"state"`
-	Region  string           `json:"region,omitempty"`
-	Type    string           `json:"type,omitempty"`
-	Billing *BillingResponse `json:"billing,omitempty"`
+	ID        string           `json:"id"`
+	State     string           `json:"state"`
+	Region    string           `json:"region,omitempty"`
+	Type      string           `json:"type,omitempty"`
+	Billing   *BillingResponse `json:"billing,omitempty"`
+	IPAddress string           `json:"ip_address,omitempty"`
 }
 
 type BillingResponse struct {

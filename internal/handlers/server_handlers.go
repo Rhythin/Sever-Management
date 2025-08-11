@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rhythin/sever-management/internal/domain"
 	"github.com/rhythin/sever-management/internal/logging"
 	"github.com/rhythin/sever-management/internal/packets"
-	"github.com/rhythin/sever-management/internal/persistence"
 	"github.com/rhythin/sever-management/internal/service"
 )
 
 // ServerHandlers provides HTTP handlers for server endpoints
-
-type ServerHandlers struct {
-	Service *service.ServerService
-	Repo    *persistence.ServerRepo
+type serverHandler struct {
+	Service service.ServerService
 }
 
 // @Summary Provision a new virtual server
@@ -24,11 +23,11 @@ type ServerHandlers struct {
 // @Tags servers
 // @Accept json
 // @Produce json
-// @Param server body provisionRequest true "Server spec"
-// @Success 201 {object} provisionResponse
+// @Param server body ProvisionRequest true "Server spec"
+// @Success 201 {object} map[string]string
 // @Failure 400 {object} errorResponse
 // @Router /server [post]
-func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request) {
+func (h *serverHandler) ProvisionServer(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
 	log.Infow("POST /server - ProvisionServer called")
 	var req packets.ProvisionRequest
@@ -53,7 +52,7 @@ func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request)
 	}
 	log.Infow("Provisioned server", "id", id, "request", req)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(packets.ProvisionResponse{ID: id})
+	json.NewEncoder(w).Encode(map[string]string{"id": id})
 }
 
 // @Summary Get server metadata
@@ -61,37 +60,38 @@ func (h *ServerHandlers) ProvisionServer(w http.ResponseWriter, r *http.Request)
 // @Tags servers
 // @Produce json
 // @Param id path string true "Server ID"
-// @Success 200 {object} serverResponse
+// @Success 200 {object} ServerResponse
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id} [get]
-func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
+func (h *serverHandler) GetServer(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
 	log.Infow("GET /servers/{id} - GetServer called", "id", id)
-	ctx := r.Context()
-	server, err := h.Repo.GetByID(ctx, id)
-	if err != nil || server == nil {
-		log.Warnw("Server not found", "id", id)
+
+	server, err := h.Service.GetServerByID(r.Context(), id)
+	if err != nil {
+		log.Warnw("Server not found", "id", id, "error", err)
 		respondError(w, http.StatusNotFound, "server not found")
 		return
 	}
-	var lastBilled *string
-	if server.Billing.LastBilledAt != nil {
-		s := server.Billing.LastBilledAt.Format("2006-01-02T15:04:05Z07:00")
-		lastBilled = &s
-	}
+
+	// Convert to response type
 	resp := packets.ServerResponse{
 		ID:     server.ID,
-		State:  server.State,
 		Region: server.Region,
 		Type:   server.Type,
-		Billing: &packets.BillingResponse{
-			AccumulatedSeconds: server.Billing.AccumulatedSeconds,
-			LastBilledAt:       lastBilled,
-			TotalCost:          server.Billing.TotalCost,
-		},
+		State:  server.State,
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	// Add IP address if available
+	if server.IP != nil {
+		resp.IPAddress = server.IP.Address
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // @Summary Perform server action
@@ -100,73 +100,110 @@ func (h *ServerHandlers) GetServer(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Server ID"
-// @Param action body packets.ActionRequest true "Action"
-// @Success 200 {object} packets.ActionResponse
+// @Param action body ActionRequest true "Action"
+// @Success 200 {object} ActionResponse
 // @Failure 409 {object} errorResponse
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id}/action [post]
-func (h *ServerHandlers) ServerAction(w http.ResponseWriter, r *http.Request) {
+func (h *serverHandler) ServerAction(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
+	log.Infow("POST /servers/{id}/action - ServerAction called")
 	id := chi.URLParam(r, "id")
-	log.Infow("POST /servers/{id}/action - ServerAction called", "id", id)
+	if id == "" {
+		log.Warnw("Missing server ID")
+		respondError(w, http.StatusBadRequest, "server ID is required")
+		return
+	}
+
 	var req packets.ActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Warnw("Invalid action request body", "error", err)
+		log.Warnw("Invalid request body", "error", err)
 		respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	err := h.Service.Action(r.Context(), id, req.Action)
-	if err != nil {
-		if err.Error() == "server not found" {
-			log.Warnw("Server not found for action", "id", id)
-			respondError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		log.Warnw("Invalid FSM transition for server", "id", id, "error", err)
-		respondError(w, http.StatusConflict, err.Error())
+
+	// Convert string action to domain.ServerAction and validate
+	action := domain.ServerAction(req.Action)
+	if !domain.IsValidAction(action) {
+		log.Warnw("Invalid action", "action", req.Action)
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("invalid action: %s, must be one of: start, stop, reboot, terminate", req.Action))
 		return
 	}
-	log.Infow("Action performed on server", "action", req.Action, "id", id)
-	json.NewEncoder(w).Encode(packets.ActionResponse{Result: "ok"})
+
+	if err := h.Service.Action(r.Context(), id, action); err != nil {
+		log.Errorw("Failed to perform action", "error", err, "server_id", id, "action", action)
+		if err.Error() == "invalid state transition" { // Check error message instead of type
+			respondError(w, http.StatusConflict, err.Error())
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "failed to perform action")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(packets.ActionResponse{
+		Result: fmt.Sprintf("Action '%s' initiated successfully", action),
+	})
 }
 
 // @Summary List servers
-// @Description List all servers, filterable by region, status, type; supports pagination and sorting
+// @Description List all servers with optional filtering
 // @Tags servers
 // @Produce json
-// @Param region query string false "Region"
-// @Param status query string false "Status"
-// @Param type query string false "Type"
-// @Param limit query int false "Limit"
-// @Param offset query int false "Offset"
-// @Success 200 {array} serverResponse
+// @Param region query string false "Filter by region"
+// @Param type query string false "Filter by server type"
+// @Param status query string false "Filter by status"
+// @Param limit query int false "Limit number of results" default(20)
+// @Param offset query int false "Offset for pagination" default(0)
+// @Success 200 {array} ServerResponse
 // @Router /servers [get]
-func (h *ServerHandlers) ListServers(w http.ResponseWriter, r *http.Request) {
+func (h *serverHandler) ListServers(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
-	log.Infow("GET /servers - ListServers called")
-	q := r.URL.Query()
-	region := q.Get("region")
-	status := q.Get("status")
-	typ := q.Get("type")
-	limit := 20
-	offset := 0
-	if l := q.Get("limit"); l != "" {
-		fmt.Sscanf(l, "%d", &limit)
+	log.Info("GET /servers - ListServers called")
+
+	// Parse query parameters
+	region := r.URL.Query().Get("region")
+	serverType := r.URL.Query().Get("type")
+	status := r.URL.Query().Get("status")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	// Set default limit if not provided or invalid
+	if limit <= 0 || limit > 100 {
+		limit = 20
 	}
-	if o := q.Get("offset"); o != "" {
-		fmt.Sscanf(o, "%d", &offset)
-	}
-	servers, err := h.Repo.List(r.Context(), region, status, typ, limit, offset)
+
+	// Call repository to get servers
+	servers, err := h.Service.ListServers(r.Context(), region, serverType, status, limit, offset)
 	if err != nil {
 		log.Errorw("Failed to list servers", "error", err)
 		respondError(w, http.StatusInternalServerError, "failed to list servers")
 		return
 	}
-	resp := make([]packets.ServerResponse, 0, len(servers))
+
+	// Convert to response type
+	var resp []*packets.ServerResponse
 	for _, s := range servers {
-		resp = append(resp, packets.ServerResponse{ID: s.ID, State: s.State})
+		serverResp := &packets.ServerResponse{
+			ID:     s.ID,
+			Region: s.Region,
+			Type:   s.Type,
+			State:  s.State,
+		}
+
+		// Add IP address if available
+		if s.IP != nil {
+			serverResp.IPAddress = s.IP.Address
+		}
+
+		resp = append(resp, serverResp)
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // @Summary Get server logs
@@ -177,7 +214,7 @@ func (h *ServerHandlers) ListServers(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} eventLogResponse
 // @Failure 404 {object} errorResponse
 // @Router /servers/{id}/logs [get]
-func (h *ServerHandlers) GetServerLogs(w http.ResponseWriter, r *http.Request) {
+func (h *serverHandler) GetServerLogs(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
 	log.Infow("GET /servers/{id}/logs - GetServerLogs called", "id", id)
@@ -192,20 +229,19 @@ func (h *ServerHandlers) GetServerLogs(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "no logs found")
 		return
 	}
-	resp := make([]packets.EventLogResponse, 0, len(events))
+	resp := make([]*packets.EventLogResponse, 0, len(events))
 	for _, e := range events {
-		resp = append(resp, packets.EventLogResponse{Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"), Type: e.Type, Message: e.Message})
+		resp = append(resp, &packets.EventLogResponse{Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"), Type: e.Type, Message: e.Message})
 	}
 	json.NewEncoder(w).Encode(resp)
 }
-
-// --- Request/Response types ---
 
 type errorResponse struct {
 	Error string `json:"error"`
 }
 
 func respondError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(errorResponse{Error: msg})
 }

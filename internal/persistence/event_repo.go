@@ -13,7 +13,7 @@ type EventRepo struct {
 	db *gorm.DB
 }
 
-func NewEventRepo(db *gorm.DB) *EventRepo {
+func NewEventRepo(db *gorm.DB) EventRepoInterface {
 	return &EventRepo{db: db}
 }
 

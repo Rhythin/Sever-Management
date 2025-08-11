@@ -15,7 +15,7 @@ type ServerRepo struct {
 	db *gorm.DB
 }
 
-func NewServerRepo(db *gorm.DB) *ServerRepo {
+func NewServerRepo(db *gorm.DB) ServerRepoInterface {
 	return &ServerRepo{db: db}
 }
 

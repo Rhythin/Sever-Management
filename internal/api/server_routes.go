@@ -8,7 +8,7 @@ import (
 )
 
 // NewServerRouter sets up chi routes for server endpoints
-func NewServerRouter(h *handlers.ServerHandlers) http.Handler {
+func NewServerRouter(h handlers.ServerHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Post("/server", h.ProvisionServer)

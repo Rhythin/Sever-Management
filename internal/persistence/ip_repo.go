@@ -17,7 +17,7 @@ type IPRepo struct {
 	mu sync.Mutex // serialize allocation attempts for extra safety
 }
 
-func NewIPRepo(db *gorm.DB) *IPRepo {
+func NewIPRepo(db *gorm.DB) IPRepoInterface {
 	return &IPRepo{db: db}
 }
 

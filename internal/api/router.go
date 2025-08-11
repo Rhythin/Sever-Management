@@ -9,7 +9,7 @@ import (
 	"github.com/rhythin/sever-management/internal/metrics"
 )
 
-func NewRouter(serverHandlers *handlers.ServerHandlers) http.Handler {
+func NewRouter(serverHandler handlers.ServerHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(logging.RequestIDMiddleware)
@@ -25,7 +25,7 @@ func NewRouter(serverHandlers *handlers.ServerHandlers) http.Handler {
 	r.Get("/swagger/*", handlers.NewSwaggerHandler().ServeHTTP)
 
 	// Server API
-	r.Mount("/", NewServerRouter(serverHandlers))
+	r.Mount("/", NewServerRouter(serverHandler))
 
 	return r
 }
