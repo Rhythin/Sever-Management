@@ -184,15 +184,6 @@ func Test_serverService_Action(t *testing.T) {
 }
 
 func Test_serverService_Provision(t *testing.T) {
-	mockServerRepo := &mockPersistence.ServerRepoInterface{}
-	mockServerRepo.On("GetByID", mock.Anything, "id").Return(&persistence.Server{}, nil)
-
-	mockIPRepo := &mockPersistence.IPRepoInterface{}
-	mockIPRepo.On("AllocateIP", mock.Anything).Return(nil, errors.New("persisteance error failed")).Once()
-	mockIPRepo.On("AllocateIP", mock.Anything).Return(nil, nil).Once()
-
-	// mockEventRepo := &mockPersistence.EventRepoInterface{}
-
 	type fields struct {
 		servers persistence.ServerRepoInterface
 		ips     persistence.IPRepoInterface
@@ -212,6 +203,129 @@ func Test_serverService_Provision(t *testing.T) {
 	}{
 		{
 			name: "Allocate IP error",
+			fields: fields{
+				servers: &mockPersistence.ServerRepoInterface{},
+				ips: func() *mockPersistence.IPRepoInterface {
+					mock := &mockPersistence.IPRepoInterface{}
+					mock.On("AllocateIP", context.Background()).Return(nil, errors.New("allocation error"))
+					return mock
+				}(),
+				events: &mockPersistence.EventRepoInterface{},
+			},
+			args: args{
+				ctx:    context.Background(),
+				region: "us-west-1",
+				typ:    "t2.micro",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "No available IPs",
+			fields: fields{
+				servers: &mockPersistence.ServerRepoInterface{},
+				ips: func() *mockPersistence.IPRepoInterface {
+					mock := &mockPersistence.IPRepoInterface{}
+					mock.On("AllocateIP", context.Background()).Return(nil, nil)
+					return mock
+				}(),
+				events: &mockPersistence.EventRepoInterface{},
+			},
+			args: args{
+				ctx:    context.Background(),
+				region: "us-west-1",
+				typ:    "t2.micro",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "Server creation failure",
+			fields: fields{
+				servers: func() *mockPersistence.ServerRepoInterface {
+					mockServerRepo := &mockPersistence.ServerRepoInterface{}
+					mockServerRepo.On("Create", context.Background(), mock.Anything).Return(errors.New("create error"))
+					return mockServerRepo
+				}(),
+				ips: func() *mockPersistence.IPRepoInterface {
+					mockIPRepo := &mockPersistence.IPRepoInterface{}
+					mockIPRepo.On("AllocateIP", context.Background()).Return(&persistence.IPAddress{ID: 1, Address: "192.168.1.1"}, nil)
+					mockIPRepo.On("ReleaseIP", context.Background(), uint(1)).Return(nil)
+					return mockIPRepo
+				}(),
+				events: &mockPersistence.EventRepoInterface{},
+			},
+			args: args{
+				ctx:    context.Background(),
+				region: "us-west-1",
+				typ:    "t2.micro",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "IP assignment failure",
+			fields: fields{
+				servers: func() *mockPersistence.ServerRepoInterface {
+					mockServerRepo := &mockPersistence.ServerRepoInterface{}
+					mockServerRepo.On("Create", context.Background(), mock.Anything).Run(func(args mock.Arguments) {
+						server := args.Get(1).(*persistence.Server)
+						server.ID = "test-server"
+					}).Return(nil)
+					mockServerRepo.On("Delete", context.Background(), "test-server").Return(nil)
+					return mockServerRepo
+				}(),
+				ips: func() *mockPersistence.IPRepoInterface {
+					mockIPRepo := &mockPersistence.IPRepoInterface{}
+					mockIPRepo.On("AllocateIP", context.Background()).Return(&persistence.IPAddress{ID: 1, Address: "192.168.1.1"}, nil)
+					mockIPRepo.On("AssignIPToServer", context.Background(), uint(1), "test-server").Return(errors.New("assign error"))
+					mockIPRepo.On("ReleaseIP", context.Background(), uint(1)).Return(nil)
+					return mockIPRepo
+				}(),
+				events: &mockPersistence.EventRepoInterface{},
+			},
+			args: args{
+				ctx:    context.Background(),
+				region: "us-west-1",
+				typ:    "t2.micro",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "Successful provisioning",
+			fields: fields{
+				servers: func() *mockPersistence.ServerRepoInterface {
+					mockServerRepo := &mockPersistence.ServerRepoInterface{}
+					mockServerRepo.On("Create", context.Background(), mock.Anything).Run(func(args mock.Arguments) {
+						s := args.Get(1).(*persistence.Server)
+						s.ID = "test-server"
+					}).Return(nil)
+					mockServerRepo.On("UpdateServer", context.Background(), "test-server", mock.Anything).Return(nil)
+					return mockServerRepo
+				}(),
+				ips: func() *mockPersistence.IPRepoInterface {
+					mockIPRepo := &mockPersistence.IPRepoInterface{}
+					mockIPRepo.On("AllocateIP", context.Background()).Return(&persistence.IPAddress{
+						ID:      1,
+						Address: "192.168.1.1",
+					}, nil)
+					mockIPRepo.On("AssignIPToServer", context.Background(), uint(1), "test-server").Return(nil)
+					return mockIPRepo
+				}(),
+				events: func() *mockPersistence.EventRepoInterface {
+					mockEventRepo := &mockPersistence.EventRepoInterface{}
+					mockEventRepo.On("Append", context.Background(), mock.Anything).Return(nil).Twice()
+					return mockEventRepo
+				}(),
+			},
+			args: args{
+				ctx:    context.Background(),
+				region: "us-west-1",
+				typ:    "t2.micro",
+			},
+			want:    "test-server",
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
