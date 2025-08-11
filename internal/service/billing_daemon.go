@@ -16,12 +16,12 @@ import (
 // BillingDaemon periodically updates server billing based on uptime
 
 type BillingDaemon struct {
-	servers *persistence.ServerRepo
+	servers persistence.ServerRepo
 	cfg     *internal.Config
 	db      *gorm.DB
 }
 
-func NewBillingDaemon(servers *persistence.ServerRepo, db *gorm.DB, cfg *internal.Config) *BillingDaemon {
+func NewBillingDaemon(servers persistence.ServerRepo, db *gorm.DB, cfg *internal.Config) *BillingDaemon {
 	return &BillingDaemon{servers: servers, db: db, cfg: cfg}
 }
 

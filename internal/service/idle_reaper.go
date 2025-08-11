@@ -13,11 +13,11 @@ import (
 // IdleReaper terminates servers stopped for longer than IdleTimeout
 
 type IdleReaper struct {
-	servers *persistence.ServerRepo
+	servers persistence.ServerRepo
 	cfg     *internal.Config
 }
 
-func NewIdleReaper(servers *persistence.ServerRepo, cfg *internal.Config) *IdleReaper {
+func NewIdleReaper(servers persistence.ServerRepo, cfg *internal.Config) *IdleReaper {
 	return &IdleReaper{servers: servers, cfg: cfg}
 }
 
@@ -61,6 +61,7 @@ func (r *IdleReaper) reap(ctx context.Context) {
 	g, ctx := errgroup.WithContext(ctx)
 	for _, s := range servers {
 		s := s // capture loop var
+		log.Debugw("IdleReaper checking server", "id", s.ID, "stopped_at", s.StoppedAt, "cutoff", cutoff, "now", time.Now(), "condition", s.StoppedAt.Before(cutoff))
 		if s.StoppedAt != nil && s.StoppedAt.Before(cutoff) {
 			s := s
 			g.Go(func() error {

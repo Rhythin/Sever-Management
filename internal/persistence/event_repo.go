@@ -9,15 +9,15 @@ import (
 
 // EventRepo handles event log persistence
 
-type EventRepo struct {
+type eventRepo struct {
 	db *gorm.DB
 }
 
-func NewEventRepo(db *gorm.DB) EventRepoInterface {
-	return &EventRepo{db: db}
+func NewEventRepo(db *gorm.DB) EventRepo {
+	return &eventRepo{db: db}
 }
 
-func (r *EventRepo) Append(ctx context.Context, event *EventLog) error {
+func (r *eventRepo) Append(ctx context.Context, event *EventLog) error {
 	log := logging.S(ctx)
 	log.Debugw("EventRepo.Append called", "serverID", event.ServerID, "type", event.Type)
 	err := r.db.WithContext(ctx).Create(event).Error
@@ -27,7 +27,7 @@ func (r *EventRepo) Append(ctx context.Context, event *EventLog) error {
 	return err
 }
 
-func (r *EventRepo) LastN(ctx context.Context, serverID string, n int) ([]EventLog, error) {
+func (r *eventRepo) LastN(ctx context.Context, serverID string, n int) ([]EventLog, error) {
 	log := logging.S(ctx)
 	log.Debugw("EventRepo.LastN called", "serverID", serverID, "n", n)
 	var events []EventLog
@@ -43,7 +43,7 @@ func (r *EventRepo) LastN(ctx context.Context, serverID string, n int) ([]EventL
 }
 
 // GetEvents returns all events for a server, ordered by timestamp (newest first)
-func (r *EventRepo) GetEvents(ctx context.Context, serverID string) ([]EventLog, error) {
+func (r *eventRepo) GetEvents(ctx context.Context, serverID string) ([]EventLog, error) {
 	log := logging.S(ctx)
 	log.Debugw("EventRepo.GetEvents called", "serverID", serverID)
 	var events []EventLog
@@ -58,6 +58,6 @@ func (r *EventRepo) GetEvents(ctx context.Context, serverID string) ([]EventLog,
 }
 
 // AddEvent is an alias for Append for backward compatibility
-func (r *EventRepo) AddEvent(ctx context.Context, event *EventLog) error {
+func (r *eventRepo) AddEvent(ctx context.Context, event *EventLog) error {
 	return r.Append(ctx, event)
 }

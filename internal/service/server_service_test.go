@@ -55,9 +55,9 @@ func Test_serverService_Action(t *testing.T) {
 	mockEventRepo.On("Append", mock.Anything, mock.Anything).Return(nil)
 
 	type fields struct {
-		servers persistence.ServerRepoInterface
-		ips     persistence.IPRepoInterface
-		events  persistence.EventRepoInterface
+		servers persistence.ServerRepo
+		ips     persistence.IPRepo
+		events  persistence.EventRepo
 	}
 	type args struct {
 		ctx    context.Context
@@ -185,9 +185,9 @@ func Test_serverService_Action(t *testing.T) {
 
 func Test_serverService_Provision(t *testing.T) {
 	type fields struct {
-		servers persistence.ServerRepoInterface
-		ips     persistence.IPRepoInterface
-		events  persistence.EventRepoInterface
+		servers persistence.ServerRepo
+		ips     persistence.IPRepo
+		events  persistence.EventRepo
 	}
 	type args struct {
 		ctx    context.Context
@@ -396,9 +396,9 @@ func Test_serverService_GetEvents(t *testing.T) {
 	mockEventRepo.On("LastN", mock.Anything, "id", 10).Return([]persistence.EventLog{}, nil)
 
 	type fields struct {
-		servers persistence.ServerRepoInterface
-		ips     persistence.IPRepoInterface
-		events  persistence.EventRepoInterface
+		servers persistence.ServerRepo
+		ips     persistence.IPRepo
+		events  persistence.EventRepo
 	}
 	type args struct {
 		ctx context.Context
@@ -451,9 +451,9 @@ func Test_serverService_ListServers(t *testing.T) {
 	mockServerRepo.On("List", mock.Anything, "region", "status", "type", 20, 0).Return([]*persistence.Server{}, nil)
 
 	type fields struct {
-		servers persistence.ServerRepoInterface
-		ips     persistence.IPRepoInterface
-		events  persistence.EventRepoInterface
+		servers persistence.ServerRepo
+		ips     persistence.IPRepo
+		events  persistence.EventRepo
 	}
 	type args struct {
 		ctx    context.Context
@@ -513,9 +513,9 @@ func Test_serverService_GetServerByID(t *testing.T) {
 	mockServerRepo.On("GetByID", mock.Anything, "1").Return(&persistence.Server{}, nil)
 
 	type fields struct {
-		servers persistence.ServerRepoInterface
-		ips     persistence.IPRepoInterface
-		events  persistence.EventRepoInterface
+		servers persistence.ServerRepo
+		ips     persistence.IPRepo
+		events  persistence.EventRepo
 	}
 	type args struct {
 		ctx context.Context

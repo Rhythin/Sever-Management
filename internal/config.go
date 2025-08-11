@@ -23,8 +23,8 @@ type Config struct {
 
 	BillingRate      float64       `envconfig:"BILLING_RATE" default:"0.01"` // $/hr
 	IdleTimeout      time.Duration `envconfig:"IDLE_TIMEOUT" default:"30m"`
-	BillingInterval  time.Duration `envconfig:"BILLING_INTERVAL" default:"10s"`
-	ReaperInterval   time.Duration `envconfig:"REAPER_INTERVAL" default:"30m"`
+	BillingInterval  time.Duration `envconfig:"BILLING_INTERVAL" default:"1m"`
+	ReaperInterval   time.Duration `envconfig:"REAPER_INTERVAL" default:"5m"`
 	EnableIdleReaper bool          `envconfig:"ENABLE_IDLE_REAPER" default:"true"`
 
 	IPCIDR         string        `envconfig:"IP_CIDR" default:"192.168.0.0/16"`
@@ -41,3 +41,5 @@ func LoadConfig() (*Config, error) {
 	}
 	return &cfg, nil
 }
+
+//

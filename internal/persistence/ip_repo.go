@@ -12,18 +12,18 @@ import (
 
 // IPRepo handles IP allocation and release
 
-type IPRepo struct {
+type ipRepo struct {
 	db *gorm.DB
 	mu sync.Mutex // serialize allocation attempts for extra safety
 }
 
-func NewIPRepo(db *gorm.DB) IPRepoInterface {
-	return &IPRepo{db: db}
+func NewIPRepo(db *gorm.DB) IPRepo {
+	return &ipRepo{db: db}
 }
 
 // AllocateIP atomically allocates an available IP and marks it as allocated
 // Uses GORM transaction with row-level locking and a mutex for extra thread safety
-func (r *IPRepo) AllocateIP(ctx context.Context) (*IPAddress, error) {
+func (r *ipRepo) AllocateIP(ctx context.Context) (*IPAddress, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	log := logging.S(ctx)
@@ -53,7 +53,7 @@ func (r *IPRepo) AllocateIP(ctx context.Context) (*IPAddress, error) {
 	return &ip, nil
 }
 
-func (r *IPRepo) ReleaseIP(ctx context.Context, ipID uint) error {
+func (r *ipRepo) ReleaseIP(ctx context.Context, ipID uint) error {
 	log := logging.S(ctx)
 	log.Infow("IPRepo.ReleaseIP called", "ipID", ipID)
 	err := r.db.WithContext(ctx).Model(&IPAddress{}).Where("id = ?", ipID).Updates(map[string]interface{}{
@@ -67,7 +67,7 @@ func (r *IPRepo) ReleaseIP(ctx context.Context, ipID uint) error {
 }
 
 // AssignIPToServer links an IP to a server record
-func (r *IPRepo) AssignIPToServer(ctx context.Context, ipID uint, serverID string) error {
+func (r *ipRepo) AssignIPToServer(ctx context.Context, ipID uint, serverID string) error {
 	log := logging.S(ctx)
 	log.Infow("IPRepo.AssignIPToServer called", "ipID", ipID, "serverID", serverID)
 

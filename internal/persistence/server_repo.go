@@ -5,22 +5,25 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rhythin/sever-management/internal/logging"
 	"gorm.io/gorm"
 )
 
 // ServerRepo handles server persistence
 
-type ServerRepo struct {
+type serverRepo struct {
 	db *gorm.DB
 }
 
-func NewServerRepo(db *gorm.DB) ServerRepoInterface {
-	return &ServerRepo{db: db}
+func NewServerRepo(db *gorm.DB) ServerRepo {
+	return &serverRepo{db: db}
 }
 
-func (r *ServerRepo) Create(ctx context.Context, s *Server) error {
+func (r *serverRepo) Create(ctx context.Context, s *Server) error {
 	log := logging.S(ctx)
+
+	s.ID = uuid.New().String()
 	log.Infow("ServerRepo.Create called", "id", s.ID, "region", s.Region, "type", s.Type)
 	err := r.db.WithContext(ctx).Create(s).Error
 	if err != nil {
@@ -29,7 +32,7 @@ func (r *ServerRepo) Create(ctx context.Context, s *Server) error {
 	return err
 }
 
-func (r *ServerRepo) GetByID(ctx context.Context, id string) (*Server, error) {
+func (r *serverRepo) GetByID(ctx context.Context, id string) (*Server, error) {
 	log := logging.S(ctx)
 	log.Debugw("ServerRepo.GetByID called", "id", id)
 	var s Server
@@ -44,7 +47,7 @@ func (r *ServerRepo) GetByID(ctx context.Context, id string) (*Server, error) {
 	return &s, nil
 }
 
-func (r *ServerRepo) UpdateState(ctx context.Context, id string, newState string) error {
+func (r *serverRepo) UpdateState(ctx context.Context, id string, newState string) error {
 	log := logging.S(ctx)
 	log.Infow("ServerRepo.UpdateState called", "id", id, "state", newState)
 	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Update("state", newState).Error
@@ -54,7 +57,7 @@ func (r *ServerRepo) UpdateState(ctx context.Context, id string, newState string
 	return err
 }
 
-func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit, offset int) ([]*Server, error) {
+func (r *serverRepo) List(ctx context.Context, region, status, typ string, limit, offset int) ([]*Server, error) {
 	log := logging.S(ctx)
 	log.Debugw("ServerRepo.List called", "region", region, "status", status, "type", typ, "limit", limit, "offset", offset)
 	var servers []*Server
@@ -76,7 +79,7 @@ func (r *ServerRepo) List(ctx context.Context, region, status, typ string, limit
 	return servers, err
 }
 
-func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, stopped, terminated *time.Time) error {
+func (r *serverRepo) UpdateTimestamps(ctx context.Context, id string, started, stopped, terminated *time.Time) error {
 	log := logging.S(ctx)
 	log.Debugw("ServerRepo.UpdateTimestamps called", "id", id, "started", started, "stopped", stopped, "terminated", terminated)
 	updates := map[string]interface{}{}
@@ -99,12 +102,13 @@ func (r *ServerRepo) UpdateTimestamps(ctx context.Context, id string, started, s
 	return err
 }
 
-func (r *ServerRepo) UpdateBilling(ctx context.Context, id string, accumulatedSeconds int64, totalCost float64) error {
+func (r *serverRepo) UpdateBilling(ctx context.Context, id string, accumulatedSeconds int64, totalCost float64) error {
 	log := logging.S(ctx)
 	log.Debugw("ServerRepo.UpdateBilling called", "id", id, "accumulatedSeconds", accumulatedSeconds, "totalCost", totalCost)
 	err := r.db.WithContext(ctx).Model(&Billing{}).Where("server_id = ?", id).UpdateColumns(map[string]interface{}{
 		"accumulated_seconds": accumulatedSeconds,
 		"total_cost":          totalCost,
+		"last_billed_at":      time.Now(),
 	}).Error
 	if err != nil {
 		log.Errorw("ServerRepo.UpdateBilling failed", "id", id, "error", err)
@@ -112,7 +116,7 @@ func (r *ServerRepo) UpdateBilling(ctx context.Context, id string, accumulatedSe
 	return err
 }
 
-func (r *ServerRepo) UpdateServer(ctx context.Context, id string, server *Server) error {
+func (r *serverRepo) UpdateServer(ctx context.Context, id string, server *Server) error {
 	log := logging.S(ctx)
 	log.Debugw("ServerRepo.UpdateServer called", "id", id)
 	err := r.db.WithContext(ctx).Model(&Server{}).Where("id = ?", id).Updates(server).Error
