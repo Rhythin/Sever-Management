@@ -148,14 +148,8 @@ docker run -p 8080:8080 server-management
 - Uses Chi for routing
 - PostgreSQL for persistence
 - Prometheus for metrics
-|--------|-----------------------|------------------------------------|
-| POST   | /server               | Provision a new server             |
-| GET    | /servers/{id}         | Get server metadata                |
-| POST   | /servers/{id}/action  | Start, stop, reboot, terminate     |
-| GET    | /servers              | List servers (filter, paginate)    |
-| GET    | /servers/{id}/logs    | Last 100 lifecycle events          |
-| GET    | /metrics              | Prometheus metrics                 |
-| GET    | /healthz, /readyz     | Health/readiness endpoints         |
+
+
 
 See [Swagger UI](http://localhost:8080/swagger/index.html) for full details.
 
