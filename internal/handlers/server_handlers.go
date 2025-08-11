@@ -26,6 +26,7 @@ type serverHandler struct {
 // @Param server body ProvisionRequest true "Server spec"
 // @Success 201 {object} map[string]string
 // @Failure 400 {object} errorResponse
+// @Failure 409 {object} errorResponse
 // @Router /server [post]
 func (h *serverHandler) ProvisionServer(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
@@ -217,6 +218,7 @@ func (h *serverHandler) ListServers(w http.ResponseWriter, r *http.Request) {
 func (h *serverHandler) GetServerLogs(w http.ResponseWriter, r *http.Request) {
 	log := logging.S(r.Context())
 	id := chi.URLParam(r, "id")
+	println("id", id)
 	log.Infow("GET /servers/{id}/logs - GetServerLogs called", "id", id)
 	events, err := h.Service.GetEvents(r.Context(), id, 100)
 	if err != nil {
